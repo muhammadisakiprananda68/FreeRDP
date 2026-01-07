@@ -9,14 +9,14 @@ jobs:
     timeout-minutes: 3600
 
     steps:
-      - name: Update System & Install SSH
+      - name: Update system & install SSH
         run: |
           sudo apt update
           sudo apt install -y openssh-server curl
           sudo systemctl enable ssh
           sudo systemctl start ssh
 
-      - name: Create CLI User
+      - name: Create CLI user
         run: |
           USER=debian
           PASS=$(openssl rand -base64 16)
@@ -27,6 +27,13 @@ jobs:
 
           echo "CLI_USER=$USER" >> $GITHUB_ENV
           echo "CLI_PASS=$PASS" >> $GITHUB_ENV
+
+      - name: Harden SSH (basic)
+        run: |
+          sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+          sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/^#\?UsePAM.*/UsePAM yes/' /etc/ssh/sshd_config
+          sudo systemctl restart ssh
 
       - name: Install Tailscale
         run: |
@@ -43,25 +50,25 @@ jobs:
           TS_IP=$(tailscale ip -4)
           echo "TAILSCALE_IP=$TS_IP" >> $GITHUB_ENV
 
-      - name: Verify SSH Port
+      - name: Verify SSH service
         run: |
-          sudo apt install -y netcat
-          nc -zv $TAILSCALE_IP 22
+          sudo systemctl status ssh --no-pager
+          ss -tlnp | grep :22
 
       - name: SSH Access Info
         run: |
-          echo "================================"
-          echo " Debian CLI via SSH (Tailscale)"
-          echo "================================"
+          echo "======================================="
+          echo "   Debian CLI via SSH (Tailscale)      "
+          echo "======================================="
           echo "IP       : $TAILSCALE_IP"
           echo "User     : $CLI_USER"
           echo "Password : $CLI_PASS"
           echo "Port     : 22"
-          echo "================================"
+          echo "======================================="
 
-      - name: Keep Runner Alive
+      - name: Keep runner alive
         run: |
           while true; do
-            echo "[$(date)] Debian CLI Active"
+            echo "[$(date)] Debian CLI active via SSH"
             sleep 300
           done
